@@ -27,7 +27,7 @@ class Product(object):
 
     @property
     def difference(self):
-        return self.desired_price-self.price.amount_float if self.desired_price else None
+        return self.price.amount_float - self.desired_price if self.desired_price else None
 
     def calculate_discount(self) -> float:
         discount = 0
