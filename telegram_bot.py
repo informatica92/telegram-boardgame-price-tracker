@@ -81,13 +81,14 @@ def get_all_watched_urls(update: Update, context: CallbackContext):
     product_list = sf.product_list
     for product in product_list:
         message = ""
-        message += f"<b><a href='{product.url}'>{product.name}</a></b> available: {product.is_available}"
+        message += f"<b><a href='{product.url}'>{product.name}</a></b> {'🟩' if product.is_available else '🟥'}"
+        message += f"\n🏷️{product.price.amount_text}{product.price.currency } "
         if product.discount > 0:
-            message += f"\n{product.price.amount_text}{product.price.currency} " \
-                       f"<s>{product.original_price.amount_text}{product.price.currency}</s> " \
-                       f"({product.discount:.0f}%)"
-        else:
-            message += f"\n{product.price.amount_text}"
+            message += f"<s>{product.original_price.amount_text}{product.price.currency}</s> (-{product.discount:.0f}%)"
+        if product.desired_price:
+            message += f"\n💡{product.desired_price}{product.price.currency} " \
+                       f"({'+' if product.difference>0 else ''}{product.difference:.2f}{product.price.currency }) " \
+                       f"{'🥳' if product.difference<0 else '🤬'}"
         update.message.reply_text(message, parse_mode=ParseMode.HTML)
 
     # update.message.reply_text(message, parse_mode=ParseMode.HTML)
