@@ -1,3 +1,5 @@
+import json
+
 import psycopg2
 import os
 from telegram import ParseMode
@@ -27,6 +29,7 @@ class TelegramHandler(object):
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS watch (
+                watch_id SERIAL,
                 user_id INTEGER,
                 url TEXT,
                 desired_price real,
@@ -56,8 +59,8 @@ class TelegramHandler(object):
             con.close()
 
     @staticmethod
-    def list_products(context, watched_urls_dict: dict, user_id, only_below_desired_price=False, intro=""):
-        sf = ShopFactory(watched_urls_dict)
+    def list_products(context, watched_urls: list, user_id, only_below_desired_price=False, intro=""):
+        sf = ShopFactory(watched_urls)
         product_list = sf.product_list
         for product in product_list:
             if (only_below_desired_price is True and product.difference < 0) or (only_below_desired_price is False):
@@ -72,8 +75,8 @@ class TelegramHandler(object):
                                f"{'🥳' if product.difference < 0 else '🤬'}"
                 keyboard = [
                     [
-                        InlineKeyboardButton("edit desire price", callback_data=2),
-                        InlineKeyboardButton("delete", callback_data=3),
+                        InlineKeyboardButton("edit desire price", callback_data=json.dumps({'watch_id': product.watch_id, 'action': 'edit'})),
+                        InlineKeyboardButton("delete", callback_data=json.dumps({'watch_id': product.watch_id, 'action': 'delete'})),
                     ]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -90,7 +93,7 @@ class TelegramHandler(object):
     def get_all_watched_urls_by_user(self, user_id):
         con = self.get_connection()
         cur = con.cursor()
-        cur.execute(f"SELECT url, desired_price FROM public.watch WHERE user_id = {user_id}")
+        cur.execute(f"SELECT watch_id, url, desired_price FROM public.watch WHERE user_id = {user_id}")
         watched_urls = cur.fetchall()
         con.close()
         return watched_urls

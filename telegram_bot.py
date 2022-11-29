@@ -1,7 +1,8 @@
 import datetime
 
 from telegram import Update
-from telegram.ext import CommandHandler, MessageHandler, Filters, Updater, CallbackContext, ConversationHandler
+from telegram.ext import CommandHandler, MessageHandler, Filters, Updater, CallbackContext, ConversationHandler, \
+    CallbackQueryHandler
 import os
 
 from telegram_handler.telegram_handler import TelegramHandler
@@ -10,6 +11,8 @@ from telegram_handler.telegram_handler import TelegramHandler
 TOKEN = os.getenv("TOKEN")
 
 INSERTING_DESIRED_PRICE_STATE = 1
+EDIT_DESIRED_PRICE_STATE = 2
+DELETE_WATCH_STATE = 3
 
 telegram_handler = TelegramHandler()
 telegram_handler.init_schema()
@@ -46,17 +49,20 @@ def ask_for_desired_price(update: Update, context: CallbackContext):
     return INSERTING_DESIRED_PRICE_STATE
 
 
+def ask_for_new_desired_price(update: Update, context: CallbackContext):
+    url = update.message.text
+    context.user_data['url'] = url
+    update.message.reply_text("Ok, which is your desired price for this product?")
+    return INSERTING_DESIRED_PRICE_STATE
+
+
 def get_all_watched_urls_by_user(update: Update, context: CallbackContext):
     """Send a message when the command /start is issued."""
     user = update.message.from_user
     user_id = user.id
     watched_urls = telegram_handler.get_all_watched_urls_by_user(user_id)
 
-    watched_urls_dict = {}
-    for watch in watched_urls:
-        watched_urls_dict[watch[0]] = watch[1]
-
-    telegram_handler.list_products(context, watched_urls_dict, user_id)
+    telegram_handler.list_products(context, watched_urls, user_id)
 
 
 def repeated_watch(context: CallbackContext):
@@ -66,14 +72,17 @@ def repeated_watch(context: CallbackContext):
     for user_id in users:
         print(f"    user id {user_id}")
         watches = telegram_handler.get_all_watched_urls_by_user(user_id)
-        watch_dict = {}
-        for watch in watches:
-            watch_dict[watch[0]] = watch[1]
-            telegram_handler.list_products(context, watch_dict, user_id, only_below_desired_price=True, intro="WE FOUND THIS MATCH FOR YOU:\n")
+        telegram_handler.list_products(context, watches, user_id, only_below_desired_price=True, intro="WE FOUND THIS MATCH FOR YOU:\n")
 
 
 def repeated_watch_command(update: Update, context: CallbackContext):
     repeated_watch(context)
+
+
+def button(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
+    print(query.data)
 
 
 # Create the Updater and pass it your bot's token.
@@ -88,16 +97,23 @@ dp = updater.dispatcher
 dp.add_handler(CommandHandler("start", start_command))
 dp.add_handler(CommandHandler("help", help_command))
 dp.add_handler(CommandHandler("list", get_all_watched_urls_by_user))
+dp.add_handler(CallbackQueryHandler(button))
 # dp.add_handler(CommandHandler("watch_all", repeated_watch_command))
 
-conv_username_handler = ConversationHandler(
+conv_insert_new_watch_handler = ConversationHandler(
     entry_points=[MessageHandler(Filters.text, ask_for_desired_price)],
     states={INSERTING_DESIRED_PRICE_STATE: [MessageHandler(Filters.text, add_url_to_watch_list)]},
     fallbacks=[]
 )
 
+conv_inline_markup_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(button)],
+    states={INSERTING_DESIRED_PRICE_STATE: [MessageHandler(Filters.text, add_url_to_watch_list)]},
+    fallbacks=[]
+)
+
 # on non-command
-dp.add_handler(conv_username_handler)
+dp.add_handler(conv_insert_new_watch_handler)
 
 # Start the Bot
 updater.start_polling()

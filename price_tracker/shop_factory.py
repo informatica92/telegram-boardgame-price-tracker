@@ -10,25 +10,28 @@ class ShopFactory(object):
 
     SHOPS = shops.all_my_base_classes
 
-    def __init__(self, url_watch_list: dict):
+    def __init__(self, url_watch_list: list):
 
         product_list = []
         handled_urls = []
         failed_url = {}
         start_time = time()
-        for url, desired_price in url_watch_list.items():
+        all_urls = []
+        for watch_id, url, desired_price in url_watch_list:
+            all_urls.append(url)
             for shop in ShopFactory.SHOPS:
                 try:
                     if str(url).startswith(shop.URL):
                         handled_urls.append(url)
                         product = shop().get_product_from_url(url)
                         product.desired_price = desired_price
+                        product.watch_id = watch_id
                         product_list.append(product)
                 except BaseException as ex:
                     failed_url[url] = ex
         self.duration = time() - start_time
         self.product_list = product_list
-        self.unhandled_urls = list(set(url_watch_list) - set(handled_urls))
+        self.unhandled_urls = list(set(all_urls) - set(handled_urls))
         self.failed_url = failed_url
 
     def get_duration(self, unit='second'):

@@ -13,9 +13,10 @@ class Product(object):
     store: str
     url: str
     desired_price: float
+    watch_id: int
     difference: float
 
-    def __init__(self, name, price, original_price, is_available, url, store, desired_price=None):
+    def __init__(self, name, price, original_price, is_available, url, store, watch_id=None, desired_price=None):
         self.name = name
         self.price = price
         self.original_price = original_price if original_price and original_price.amount and original_price > price else price
@@ -23,6 +24,7 @@ class Product(object):
         self.is_available = is_available
         self.url = url
         self.store = store
+        self.watch_id = watch_id
         self.desired_price = desired_price
 
     @property
