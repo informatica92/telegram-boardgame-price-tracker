@@ -49,38 +49,67 @@ class TelegramHandler(object):
             con.commit()
             con.close()
 
-    def add_watch_for_user(self, user_id, url, desired_price):
+    def add_or_update_watch_for_user(self, user_id, url, desired_price):
         con = self.get_connection()
         cur = con.cursor()
         cur.execute(f"SELECT user_id, url FROM public.watch WHERE user_id = {user_id} and url = '{url}'")
         if len(cur.fetchall()) == 0:
             cur.execute(f"INSERT INTO watch (user_id, url, desired_price) VALUES ({user_id}, '{url}', {desired_price})")
-            con.commit()
-            con.close()
+        else:
+            cur.execute(f"UPDATE watch SET desired_price = {desired_price} WHERE user_id = {user_id} and url = '{url}'")
+        con.commit()
+        con.close()
+
+    def get_watch(self, watch_id):
+        con = self.get_connection()
+        cur = con.cursor()
+        cur.execute(f"SELECT user_id, url, desired_price FROM public.watch WHERE watch_id = {watch_id}")
+        return cur.fetchone()
+
+    def delete_watch(self, watch_id):
+        con = self.get_connection()
+        cur = con.cursor()
+        cur.execute(f"DELETE FROM public.watch WHERE watch_id = {watch_id}")
+        rows_deleted = cur.rowcount
+        con.commit()
+        con.close()
+        return rows_deleted
 
     @staticmethod
     def list_products(context, watched_urls: list, user_id, only_below_desired_price=False, intro=""):
         sf = ShopFactory(watched_urls)
         product_list = sf.product_list
-        for product in product_list:
-            if (only_below_desired_price is True and product.difference < 0) or (only_below_desired_price is False):
+        for prod in product_list:
+            if (only_below_desired_price is True and prod.difference < 0) or (only_below_desired_price is False):
                 message = intro
-                message += f"<b><a href='{product.url}'>{product.name}</a></b> {'🟩' if product.is_available else '🟥'}"
-                message += f"\n🏷️{product.price.amount_text}{product.price.currency} "
-                if product.discount > 0:
-                    message += f"<s>{product.original_price.amount_text}{product.price.currency}</s> (-{product.discount:.0f}%)"
-                if product.desired_price:
-                    message += f"\n💡{product.desired_price}{product.price.currency} " \
-                               f"({'+' if product.difference > 0 else ''}{product.difference:.2f}{product.price.currency}) " \
-                               f"{'🥳' if product.difference < 0 else '🤬'}"
+                message += f"<b><a href='{prod.url}'>{prod.name}</a></b> {'🟩' if prod.is_available else '🟥'}"
+                message += f"\n🏷️{prod.price.amount_text}{prod.price.currency} "
+                if prod.discount > 0:
+                    message += f"<s>{prod.original_price.amount_text}{prod.price.currency}</s> " \
+                               f"(-{prod.discount:.0f}%)"
+                if prod.desired_price:
+                    message += f"\n💡{prod.desired_price}{prod.price.currency} " \
+                               f"({'+' if prod.difference > 0 else ''}{prod.difference:.2f}{prod.price.currency}) " \
+                               f"{'🥳' if prod.difference < 0 else '🤬'}"
                 keyboard = [
                     [
-                        InlineKeyboardButton("edit desire price", callback_data=json.dumps({'watch_id': product.watch_id, 'action': 'edit'})),
-                        InlineKeyboardButton("delete", callback_data=json.dumps({'watch_id': product.watch_id, 'action': 'delete'})),
+                        InlineKeyboardButton(
+                            "✒edit desire price",
+                            callback_data=json.dumps({'watch_id': prod.watch_id, 'action': 'edit'})
+                        ),
+                        InlineKeyboardButton(
+                            "❌delete",
+                            callback_data=json.dumps({'watch_id': prod.watch_id, 'action': 'delete'})
+                        ),
                     ]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                context.bot.send_message(chat_id=user_id, text=message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+                context.bot.send_message(
+                    chat_id=user_id,
+                    text=message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup
+                )
         failed_urls = sf.get_failed_urls()
         unhandled_urls = sf.get_unhandled_urls()
         if failed_urls:
@@ -106,4 +135,3 @@ class TelegramHandler(object):
         con.close()
         users = [user[0] for user in users]
         return users
-
